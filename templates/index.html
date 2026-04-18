@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommender</title>
+    <meta name="description" content="Find your next favorite movie or TV show with semantic search powered by sentence-transformers.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e2e2e8;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* moving gradient blob in the background for some visual flair */
+        .bg-glow {
+            position: fixed;
+            top: -30%;
+            left: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(99, 56, 232, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 20s ease-in-out infinite alternate;
+        }
+
+        .bg-glow-2 {
+            position: fixed;
+            bottom: -20%;
+            right: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, rgba(232, 56, 99, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 25s ease-in-out infinite alternate-reverse;
+        }
+
+        @keyframes drift {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(5vw, 3vh) scale(1.1); }
+            100% { transform: translate(-3vw, 5vh) scale(0.95); }
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 60px 24px 40px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* header area */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #c084fc, #e879a8, #f9a872);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #8888a0;
+            font-size: 1rem;
+            font-weight: 300;
+        }
+
+        /* the search box */
+        .search-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            color: #e2e2e8;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+        }
+
+        .search-box input::placeholder {
+            color: #55556a;
+        }
+
+        .search-box input:focus {
+            border-color: rgba(192, 132, 252, 0.4);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.08);
+        }
+
+        .search-box button {
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.25s, opacity 0.2s;
+            white-space: nowrap;
+        }
+
+        .search-box button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+        }
+
+        .search-box button:active {
+            transform: translateY(0);
+        }
+
+        .search-box button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* loading spinner */
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        .spinner-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin: 0 4px;
+            background: #7c3aed;
+            border-radius: 50%;
+            animation: bounce 1.2s ease-in-out infinite;
+        }
+
+        .spinner-dot:nth-child(2) { animation-delay: 0.15s; }
+        .spinner-dot:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40% { transform: translateY(-12px); opacity: 1; }
+        }
+
+        /* results section */
+        #results {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .result-count {
+            color: #8888a0;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            padding-left: 4px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 24px;
+            transition: border-color 0.3s, background 0.3s, transform 0.2s;
+            animation: fadeUp 0.4s ease-out both;
+        }
+
+        .card:hover {
+            border-color: rgba(192, 132, 252, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #f0f0f5;
+        }
+
+        .card-score {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #a855f7;
+            background: rgba(168, 85, 247, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .tag {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #aaaabc;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .tag.type-movie {
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.15);
+        }
+
+        .tag.type-tv {
+            background: rgba(52, 211, 153, 0.1);
+            color: #34d399;
+            border-color: rgba(52, 211, 153, 0.15);
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #9999ab;
+        }
+
+        .card-details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.8rem;
+            color: #6c6c80;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .card-details span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .detail-label {
+            color: #55556a;
+        }
+
+        /* error state */
+        .error-msg {
+            text-align: center;
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.08);
+            border: 1px solid rgba(248, 113, 113, 0.15);
+            border-radius: 12px;
+            padding: 16px 24px;
+            font-size: 0.9rem;
+        }
+
+        /* empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #55556a;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .empty-state .hint {
+            font-size: 0.8rem;
+            margin-top: 16px;
+            color: #44445a;
+        }
+
+        /* responsive tweaks */
+        @media (max-width: 600px) {
+            .container {
+                padding: 36px 16px 24px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            .search-box button {
+                padding: 14px;
+            }
+
+            .card-header {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="bg-glow-2"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>Movie Recommender</h1>
+            <p>Describe what you're in the mood for and we'll find something great</p>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="queryInput" placeholder="e.g. funny comedies about family, or dark sci-fi thrillers..." autofocus>
+            <button id="searchBtn" onclick="search()">Search</button>
+        </div>
+
+        <div class="spinner" id="spinner">
+            <div class="spinner-dot"></div>
+            <div class="spinner-dot"></div>
+            <div class="spinner-dot"></div>
+        </div>
+
+        <div id="results">
+            <div class="empty-state">
+                <p>Type anything you want to watch and hit search.</p>
+                <p class="hint">Try: "80s action movies" or "romantic korean dramas" or "documentaries about food"</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const input = document.getElementById("queryInput");
+        const btn = document.getElementById("searchBtn");
+        const spinner = document.getElementById("spinner");
+        const resultsDiv = document.getElementById("results");
+
+        // let users hit enter to search, obviously
+        input.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") search();
+        });
+
+        async function search() {
+            const query = input.value.trim();
+            if (!query) return;
+
+            // disable everything while we wait
+            btn.disabled = true;
+            btn.textContent = "Searching...";
+            spinner.classList.add("active");
+            resultsDiv.innerHTML = "";
+
+            try {
+                const resp = await fetch("/recommend", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: query, top_k: 10 }),
+                });
+
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    resultsDiv.innerHTML = `<div class="error-msg">${data.error || "Something went wrong"}</div>`;
+                    return;
+                }
+
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = `<div class="empty-state"><p>No results found. Try a different search?</p></div>`;
+                    return;
+                }
+
+                // show how many we got
+                let html = `<div class="result-count">${data.count} results for "${data.query}"</div>`;
+
+                data.results.forEach(function(item, i) {
+                    // figure out the type tag class
+                    const typeClass = item.type === "Movie" ? "type-movie" : "type-tv";
+
+                    // stagger the animation a tiny bit per card
+                    const delay = i * 0.06;
+
+                    html += `
+                        <div class="card" style="animation-delay: ${delay}s">
+                            <div class="card-header">
+                                <div class="card-title">${escapeHtml(item.title)}</div>
+                                <div class="card-score">${(item.score * 100).toFixed(1)}% match</div>
+                            </div>
+                            <div class="card-meta">
+                                <span class="tag ${typeClass}">${escapeHtml(item.type)}</span>
+                                <span class="tag">${escapeHtml(item.release_year)}</span>
+                                <span class="tag">${escapeHtml(item.rating)}</span>
+                                ${item.duration !== "N/A" ? `<span class="tag">${escapeHtml(item.duration)}</span>` : ""}
+                            </div>
+                            <div class="card-description">${escapeHtml(item.description)}</div>
+                            <div class="card-details">
+                                ${item.director !== "N/A" ? `<span><span class="detail-label">Dir:</span> ${escapeHtml(item.director)}</span>` : ""}
+                                ${item.genres !== "N/A" ? `<span><span class="detail-label">Genre:</span> ${escapeHtml(item.genres)}</span>` : ""}
+                                ${item.country !== "N/A" ? `<span><span class="detail-label">Country:</span> ${escapeHtml(item.country)}</span>` : ""}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                resultsDiv.innerHTML = html;
+
+            } catch (err) {
+                console.error("search failed:", err);
+                resultsDiv.innerHTML = `<div class="error-msg">Could not reach the server. Is it running?</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Search";
+                spinner.classList.remove("active");
+            }
+        }
+
+        // basic XSS prevention
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

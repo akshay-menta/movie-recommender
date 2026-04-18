@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.cache/
+*.egg-info/
+.git/
+.gitignore
+.dockerignore
+demo.png
+README.md
+About_Telo_AI_Co_op.pdf
+Assessment.pdf
