@@ -100,7 +100,7 @@ Here are some things you can try:
 
 ## Demo
 
-![Demo Screenshot](demo.png)
+![Demo Screenshot](demo.jpeg)
 
 ## Tech Stack
 
